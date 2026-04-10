@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SUBT·LAB — Transcription Studio</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Anybody:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+:root {
+  --bg: #0F1115;
+  --surface: #181B21;
+  --surface-2: #1E2229;
+  --seg-bg: #14171C;
+  --border: #2A2F38;
+  --text: #E8E6E3;
+  --text-dim: #8B8D94;
+  --text-muted: #5A5D65;
+  --accent: #F59E0B;
+  --accent-dim: #D97706;
+  --danger: #EF4444;
+  --time-color: #A78BFA;
+  --trans-bg: #111318;
+  --hover: #22262E;
+  --focus: rgba(245,158,11,0.15);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Anybody', 'DM Sans', system-ui, sans-serif; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+textarea, input { font-family: 'DM Sans', system-ui, sans-serif; }
+textarea:focus, input:focus { outline: none; border-color: var(--accent) !important; box-shadow: 0 0 0 2px var(--focus); }
+#app { display: flex; flex-direction: column; height: 100vh; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+#main { display: grid; grid-template-columns: 420px 1fr; flex: 1; overflow: hidden; }
+#main.collapsed { grid-template-columns: 1fr; }
+#main.collapsed #source-panel { display: none; }
+#source-panel { border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--surface); overflow: hidden; }
+#segment-panel { display: flex; flex-direction: column; overflow: hidden; }
+#video-area { aspect-ratio: 16/9; background: #000; display: flex; align-items: center; justify-content: center; flex-shrink: 0; min-height: 200px; }
+#video-area iframe, #video-area video { width: 100%; height: 100%; border: none; }
+#transport { padding: 10px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.time-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.time-lbl { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--time-color); min-width: 85px; }
+.time-lbl.end { text-align: right; }
+#transport input[type=range] { flex: 1; accent-color: var(--accent); height: 4px; }
+.ctrl-row { display: flex; justify-content: space-between; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer; font-size: 12px; font-family: inherit; font-weight: 500; transition: all .15s; }
+.btn:hover { background: var(--hover); border-color: var(--text-muted); }
+.btn-accent { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+.btn-accent:hover { background: var(--accent-dim); }
+.btn-sm { padding: 3px 8px; font-size: 11px; }
+.btn-icon { padding: 4px 6px; min-width: 28px; justify-content: center; }
+.btn-ghost { background: transparent; border-color: transparent; }
+.btn-ghost:hover { background: var(--hover); border-color: var(--border); }
+.btn-danger:hover { background: rgba(239,68,68,.15); border-color: var(--danger); color: var(--danger); }
+.rate-btn { font-variant-numeric: tabular-nums; min-width: 44px; text-align: center; }
+.rate-active { background: var(--accent) !important; color: #000 !important; border-color: var(--accent) !important; font-weight: 700; }
+#source-input { padding: 14px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+#source-input input[type=text] { flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--seg-bg); color: var(--text); font-size: 13px; }
+#speaker-bar { padding: 10px 14px; border-top: 1px solid var(--border); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; flex-shrink: 0; }
+.spk-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all .15s; }
+.spk-badge:hover { filter: brightness(1.2); }
+.spk-badge.active { border-color: currentColor; }
+.spk-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+#tips { padding: 10px 14px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted); line-height: 1.7; flex: 1; overflow-y: auto; }
+#tips kbd { background: var(--surface-2); padding: 1px 5px; border-radius: 3px; border: 1px solid var(--border); font-size: 10px; }
+#seg-toolbar { padding: 8px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface); flex-shrink: 0; }
+#seg-header { display: grid; grid-template-columns: 44px 100px 100px 1fr 1fr 90px; padding: 6px 16px; border-bottom: 1px solid var(--border); font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; background: var(--surface); flex-shrink: 0; }
+#seg-list { flex: 1; overflow-y: auto; }
+.seg-row { display: grid; grid-template-columns: 44px 100px 100px 1fr 1fr 90px; padding: 8px 16px; border-bottom: 1px solid var(--border); cursor: pointer; align-items: start; border-left: 3px solid transparent; transition: background .15s; }
+.seg-row:hover { background: var(--hover); }
+.seg-row.active { background: var(--focus); }
+.seg-idx { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 2px; }
+.seg-idx span:first-child { font-size: 11px; font-weight: 600; color: var(--text-dim); }
+.seg-spk-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--bg); }
+.seg-spk-name { font-size: 9px; font-weight: 600; max-width: 40px; text-align: center; line-height: 1.1; }
+.time-input { font-family: 'JetBrains Mono', monospace; font-size: 11px; background: var(--seg-bg); border: 1px solid var(--border); border-radius: 4px; padding: 2px 4px; color: var(--time-color); width: 108px; text-align: center; }
+.stamp-btn { margin-top: 2px; font-size: 9px !important; padding: 1px 4px !important; }
+.seg-dur { font-size: 9px; color: var(--text-muted); margin-top: 2px; }
+.seg-ta { width: 100%; resize: vertical; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--seg-bg); color: var(--text); font-size: 13px; line-height: 1.5; font-family: 'DM Sans', sans-serif; min-height: 64px; }
+.seg-ta.trans { background: var(--trans-bg); }
+.seg-ta.warn { border-color: var(--danger); }
+.char-warn { color: var(--danger); font-size: 10px; font-weight: 500; }
+.cc { font-size: 9px; color: var(--text-muted); }
+.seg-actions { display: flex; flex-direction: column; gap: 3px; align-items: flex-end; }
+.ff { display: flex; justify-content: space-between; margin-top: 2px; }
+.ffr { display: flex; justify-content: flex-end; margin-top: 2px; gap: 8px; }
+.sb { display: flex; gap: 4px; }
+.sb button { padding: 0 4px !important; font-size: 9px !important; }
+#empty-state { padding: 48px; text-align: center; color: var(--text-muted); display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.mo { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; max-width: 520px; width: 90%; max-height: 85vh; overflow-y: auto; }
+.modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; font-family: 'Anybody'; }
+.mgt { font-size: 11px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+.srow { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
+.srow kbd { background: var(--surface-2); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); font-family: 'JetBrains Mono'; font-size: 11px; }
+.srow span { color: var(--text-dim); }
+.ebtn { justify-content: flex-start; width: 100%; margin-bottom: 4px; }
+.spk-edit-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+.spk-edit-row input[type=color] { width: 32px; height: 32px; border: none; background: none; cursor: pointer; }
+.spk-edit-row input[type=text] { flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--seg-bg); color: var(--text); font-size: 13px; }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #000; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 200; animation: su .3s ease; box-shadow: 0 8px 32px rgba(245,158,11,.3); }
+@keyframes su { from { opacity: 0; transform: translateX(-50%) translateY(12px); } }
+.hid { display: none !important; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-family:'Anybody';font-weight:800;font-size:18px;letter-spacing:-.5px;color:var(--accent)">SUBT·LAB</span>
+      <span id="seg-count" style="color:var(--text-muted);font-size:11px;font-weight:500">0 segments</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-sm" onclick="tog('shortcuts-modal')">Shortcuts <span style="opacity:.5">?</span></button>
+      <button class="btn btn-sm" onclick="tog('speakers-modal')">Speakers</button>
+      <button class="btn btn-sm" onclick="tog('export-modal')">⬇ Export</button>
+    </div>
+  </header>
+  <div id="main">
+    <div id="source-panel">
+      <div id="video-area">
+        <div id="video-placeholder" style="text-align:center;color:var(--text-muted)">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".4"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+          <div style="font-size:13px;margin-top:8px">Load a video to begin</div>
+        </div>
+      </div>
+      <div id="transport" class="hid">
+        <div class="time-row">
+          <span class="time-lbl" id="tc">00:00:00.000</span>
+          <input type="range" id="scrub" min="0" max="1" step="0.1" value="0"/>
+          <span class="time-lbl end" id="td">00:00:00.000</span>
+        </div>
+        <div class="ctrl-row">
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-icon" onclick="doSeek(curT-5)">⏪</button>
+            <button class="btn btn-icon btn-accent" onclick="togglePlay()" id="pbtn">▶</button>
+            <button class="btn btn-icon" onclick="doSeek(curT+5)">⏩</button>
+          </div>
+          <div id="rates" style="display:flex;gap:2px"></div>
+        </div>
+      </div>
+      <div id="source-input">
+        <div style="display:flex;gap:8px">
+          <input type="text" id="urlin" placeholder="Paste YouTube URL..."/>
+          <button class="btn" onclick="loadUrl()">Load</button>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input type="file" id="filin" accept="video/*,audio/*,.srt,.vtt,.txt" style="display:none"/>
+          <button class="btn" onclick="document.getElementById('filin').click()" style="flex:1">Upload video / audio / subtitle file</button>
+          <button class="btn hid" id="ytcap" onclick="fetchYTCaptions()">Pull YT Captions</button>
+        </div>
+        <div id="ytst" class="hid" style="font-size:11px"></div>
+      </div>
+      <div id="speaker-bar"></div>
+      <div id="tips">
+        <div style="margin-bottom:8px;font-weight:600;color:var(--text-dim)">Quick tips</div>
+        <div><kbd>Space</kbd> play/pause (no field focused)</div>
+        <div><kbd>N</kbd> add segment at playhead</div>
+        <div><kbd>Alt+1-4</kbd> assign speakers</div>
+        <div><kbd>[</kbd> / <kbd>]</kbd> change speed</div>
+        <div style="margin-top:6px;opacity:.7">Subtitle guideline: ≤42 chars/line, ≤2 lines/segment.</div>
+      </div>
+    </div>
+    <div id="segment-panel">
+      <div id="seg-toolbar">
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-sm btn-ghost" onclick="togSrc()" id="tsb">◀ Hide source</button>
+          <button class="btn btn-sm btn-accent" onclick="addSeg()">+ Add Segment</button>
+          <button class="btn btn-sm hid" id="phbtn" onclick="addSegPH()">+ At Playhead</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-dim);cursor:pointer">
+          <input type="checkbox" id="ascr" checked style="accent-color:var(--accent)"/> Auto-scroll
+        </label>
+      </div>
+      <div id="seg-header">
+        <span>#</span><span>Start</span><span>End</span>
+        <span>Transcription (original)</span><span>Translation</span>
+        <span style="text-align:right">Actions</span>
+      </div>
+      <div id="seg-list">
+        <div id="empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".3"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          <span style="font-size:14px">No segments yet</span>
+          <span style="font-size:12px">Click "Add Segment" or press <kbd style="background:var(--surface-2);padding:1px 5px;border-radius:3px;border:1px solid var(--border)">N</kbd></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="shortcuts-modal" class="mo hid" onclick="if(event.target===this)this.classList.add('hid')">
+  <div class="modal">
+    <h3>Keyboard Shortcuts</h3>
+    <div style="margin-bottom:16px"><div class="mgt">Global (no text field focused)</div>
+      <div class="srow"><kbd>Space</kbd><span>Play / Pause</span></div>
+      <div class="srow"><kbd>← →</kbd><span>Seek ±5 seconds</span></div>
+      <div class="srow"><kbd>↑ ↓</kbd><span>Navigate segments</span></div>
+      <div class="srow"><kbd>N</kbd><span>New segment at playhead</span></div>
+      <div class="srow"><kbd>Alt + 1–4</kbd><span>Assign speaker</span></div>
+      <div class="srow"><kbd>[ ]</kbd><span>Change playback speed</span></div>
+      <div class="srow"><kbd>?</kbd><span>Toggle this panel</span></div>
+    </div>
+    <div style="margin-bottom:16px"><div class="mgt">Inside a text field</div>
+      <div class="srow"><kbd>Ctrl+Enter</kbd><span>Play / Pause</span></div>
+      <div class="srow"><kbd>Ctrl+Shift+←</kbd><span>Seek back 5s</span></div>
+      <div class="srow"><kbd>Ctrl+Shift+→</kbd><span>Seek forward 5s</span></div>
+      <div class="srow"><kbd>Escape</kbd><span>Blur field</span></div>
+    </div>
+    <button class="btn" style="width:100%;justify-content:center" onclick="tog('shortcuts-modal')">Close</button>
+  </div>
+</div>
+<div id="export-modal" class="mo hid" onclick="if(event.target===this)this.classList.add('hid')">
+  <div class="modal"><h3>Export Segments</h3><div id="exopts"></div>
+    <button class="btn" style="width:100%;justify-content:center;margin-top:12px" onclick="tog('export-modal')">Cancel</button>
+  </div>
+</div>
+<div id="speakers-modal" class="mo hid" onclick="if(event.target===this)this.classList.add('hid')">
+  <div class="modal"><h3>Edit Speakers</h3><div id="sped"></div>
+    <button class="btn btn-sm" style="margin-top:4px" onclick="addSpkSlot()">+ Add Speaker</button>
+    <button class="btn btn-accent" style="width:100%;justify-content:center;margin-top:16px" onclick="tog('speakers-modal')">Done</button>
+  </div>
+</div>
+<div id="toast" class="toast hid"></div>
+
+<script>
+let segs=[],spks=[
+  {id:"s1",name:"Speaker 1",color:"#F59E0B"},
+  {id:"s2",name:"Speaker 2",color:"#3B82F6"},
+  {id:"s3",name:"Speaker 3",color:"#10B981"},
+  {id:"s4",name:"Speaker 4",color:"#EC4899"}
+],aSpk="s1",aIdx=null,curT=0,dur=0,rate=1,playing=false,ytId=null,srcOff=false,ytIf=null,vidEl=null,poll=null;
+
+function $(i){return document.getElementById(i)}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function fmt(s){if(s==null||isNaN(s))return"00:00:00.000";const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=Math.floor(s%60),ms=Math.round((s%1)*1000);return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sc).padStart(2,"0")}.${String(ms).padStart(3,"0")}`}
+function pf(str){if(!str)return 0;const p=str.split(":");if(p.length!==3)return 0;const[h,m,sMs]=p,[s,ms]=sMs.split(".");return parseInt(h)*3600+parseInt(m)*60+parseInt(s)+(parseInt(ms||0)/1000)}
+function esc(s){return(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+function gsp(id){return spks.find(s=>s.id===id)||spks[0]}
+function toast(m){const t=$("toast");t.textContent=m;t.classList.remove("hid");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.add("hid"),2500)}
+function tog(id){const el=$(id);el.classList.toggle("hid");if(id==="speakers-modal"&&!el.classList.contains("hid"))rSpkEd();if(id==="export-modal"&&!el.classList.contains("hid"))rExOpts()}
+
+// YouTube via plain iframe + postMessage
+function ytCmd(f,a){if(!ytIf)return;ytIf.contentWindow.postMessage(JSON.stringify({event:"command",func:f,args:a||[]}),"*")}
+function initYT(id){
+  ytId=id;ytIf=null;vidEl=null;clearInterval(poll);
+  const area=$("video-area");area.innerHTML="";
+  const ifr=document.createElement("iframe");
+  ifr.src=`https://www.youtube.com/embed/${id}?enablejsapi=1&modestbranding=1&rel=0`;
+  ifr.allow="autoplay;encrypted-media";ifr.allowFullscreen=true;
+  area.appendChild(ifr);ytIf=ifr;
+  window.addEventListener("message",onYTMsg);
+  ifr.onload=()=>{
+    ytCmd("addEventListener",["onStateChange"]);
+    poll=setInterval(()=>{ytCmd("getCurrentTime");ytCmd("getDuration");ytCmd("getPlayerState")},250);
+  };
+  $("transport").classList.remove("hid");$("phbtn").classList.remove("hid");$("ytcap").classList.remove("hid");
+}
+function onYTMsg(e){
+  let d;try{d=JSON.parse(e.data)}catch{return}
+  if(!d||!d.event)return;
+  if(d.event==="infoDelivery"&&d.info){
+    if(typeof d.info.currentTime==="number"){curT=d.info.currentTime;updTime();updASeg()}
+    if(typeof d.info.duration==="number"&&d.info.duration>0){dur=d.info.duration;$("scrub").max=dur;$("td").textContent=fmt(dur)}
+    if(typeof d.info.playerState==="number"){playing=d.info.playerState===1;updPB()}
+  }
+  if(d.event==="onStateChange"&&d.info!=null){playing=d.info===1;updPB()}
+}
+
+// Local video
+function initLocal(url){
+  ytId=null;ytIf=null;clearInterval(poll);window.removeEventListener("message",onYTMsg);
+  const area=$("video-area");area.innerHTML="";
+  const v=document.createElement("video");v.src=url;v.preload="metadata";area.appendChild(v);vidEl=v;
+  v.addEventListener("loadedmetadata",()=>{dur=v.duration;$("scrub").max=dur;$("td").textContent=fmt(dur)});
+  v.addEventListener("timeupdate",()=>{curT=v.currentTime;updTime();updASeg()});
+  v.addEventListener("play",()=>{playing=true;updPB()});
+  v.addEventListener("pause",()=>{playing=false;updPB()});
+  $("transport").classList.remove("hid");$("phbtn").classList.remove("hid");$("ytcap").classList.add("hid");
+}
+
+// Playback
+function togglePlay(){if(ytIf)ytCmd(playing?"pauseVideo":"playVideo");else if(vidEl)playing?vidEl.pause():vidEl.play()}
+function doSeek(t){t=Math.max(0,Math.min(t,dur));curT=t;if(ytIf)ytCmd("seekTo",[t,true]);else if(vidEl)vidEl.currentTime=t;updTime()}
+function setR(r){rate=r;if(ytIf)ytCmd("setPlaybackRate",[r]);else if(vidEl)vidEl.playbackRate=r;rRates()}
+function updTime(){$("tc").textContent=fmt(curT);$("scrub").value=curT}
+function updPB(){$("pbtn").textContent=playing?"⏸":"▶"}
+$("scrub").addEventListener("input",e=>doSeek(parseFloat(e.target.value)));
+function rRates(){const c=$("rates");c.innerHTML="";[.5,.75,1,1.25,1.5].forEach(r=>{const b=document.createElement("button");b.className=`btn btn-sm rate-btn${rate===r?" rate-active":""}`;b.textContent=r+"×";b.onclick=()=>setR(r);c.appendChild(b)})}
+rRates();
+
+// Source loading
+function parseYTId(u){if(!u)return null;let m=u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);if(m)return m[1];m=u.match(/^([a-zA-Z0-9_-]{11})$/);return m?m[1]:null}
+function loadUrl(){const u=$("urlin").value.trim(),id=parseYTId(u);if(id){initYT(id);$("ytst").classList.add("hid")}else toast("Couldn't parse YouTube URL")}
+$("urlin").addEventListener("keydown",e=>{if(e.key==="Enter")loadUrl()});
+$("filin").addEventListener("change",e=>{
+  const f=e.target.files?.[0];if(!f)return;
+  if(/\.(srt|vtt|txt)$/i.test(f.name)){const r=new FileReader();r.onload=ev=>impSub(ev.target.result);r.readAsText(f)}
+  else initLocal(URL.createObjectURL(f));
+  e.target.value="";
+});
+function impSub(text){
+  const lines=text.split("\n"),parsed=[];let i=0;
+  while(i<lines.length){const tl=lines.findIndex((l,j)=>j>=i&&l.includes("-->"));if(tl===-1)break;
+    const[sS,eS]=lines[tl].split("-->").map(s=>s.trim());
+    const st=pf(sS.replace(",",".")),en=pf(eS.replace(",","."));let tL=[];
+    for(let j=tl+1;j<lines.length;j++){if(lines[j].trim()===""||(!isNaN(lines[j].trim())&&j+1<lines.length&&lines[j+1].includes("-->")))break;tL.push(lines[j])}
+    const sp=gsp("s1");
+    parsed.push({id:uid(),start:st,end:en,transcription:tL.join(" ").trim(),translation:"",speakerId:"s1",speakerName:sp.name,speakerColor:sp.color});
+    i=tl+1+tL.length+1;
+  }
+  if(parsed.length){segs=parsed;render();toast(`Imported ${parsed.length} segments`)}
+}
+
+// YT captions
+async function fetchYTCaptions(){
+  if(!ytId)return;const st=$("ytst");st.classList.remove("hid");st.style.color="var(--text-dim)";st.textContent="Fetching...";
+  try{
+    const r=await fetch(`https://www.youtube.com/watch?v=${ytId}`),html=await r.text();
+    const m=html.match(/"captionTracks":\s*(\[.*?\])/);if(!m){st.style.color="var(--danger)";st.textContent="No captions. Download SRT externally and import via file upload.";return}
+    const tracks=JSON.parse(m[1]);if(!tracks.length){st.style.color="var(--danger)";st.textContent="No tracks.";return}
+    const tr=await fetch(tracks[0].baseUrl),xml=await tr.text();
+    const doc=new DOMParser().parseFromString(xml,"text/xml"),txts=doc.querySelectorAll("text");
+    const sp=gsp("s1");
+    segs=Array.from(txts).map(n=>{const s=parseFloat(n.getAttribute("start")),d=parseFloat(n.getAttribute("dur")||"3");
+      return{id:uid(),start:s,end:s+d,transcription:n.textContent.replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"'),translation:"",speakerId:"s1",speakerName:sp.name,speakerColor:sp.color}});
+    render();st.style.color="#10B981";st.textContent=`Imported ${segs.length} segments.`;toast(`Imported ${segs.length} segments`);
+  }catch{st.style.color="var(--danger)";st.textContent="Caption fetch failed (CORS). Download SRT externally and import."}
+}
+
+// Segments
+function addSeg(){const sp=gsp(aSpk),le=segs.length?segs[segs.length-1].end:0;
+  segs.push({id:uid(),start:le,end:Math.min(le+5,dur||le+5),transcription:"",translation:"",speakerId:aSpk,speakerName:sp.name,speakerColor:sp.color});
+  aIdx=segs.length-1;render();scrA()}
+function addSegPH(){const sp=gsp(aSpk),s={id:uid(),start:curT,end:Math.min(curT+5,dur||curT+5),transcription:"",translation:"",speakerId:aSpk,speakerName:sp.name,speakerColor:sp.color};
+  const i=segs.findIndex(x=>x.start>curT);if(i===-1){segs.push(s);aIdx=segs.length-1}else{segs.splice(i,0,s);aIdx=i}render();scrA()}
+function delSeg(i){segs.splice(i,1);if(aIdx>=i&&aIdx>0)aIdx--;render()}
+function splitSeg(i){const s=segs[i];if(!s)return;const m=(s.start+s.end)/2;segs.splice(i,1,{...s,end:m,id:uid()},{...s,start:m,id:uid(),transcription:"",translation:""});render()}
+function mergeSeg(i){if(i>=segs.length-1)return;const a=segs[i],b=segs[i+1];a.end=b.end;a.transcription=(a.transcription+" "+b.transcription).trim();a.translation=(a.translation+" "+b.translation).trim();segs.splice(i+1,1);render()}
+function asgSpk(i,sid){const sp=gsp(sid);segs[i].speakerId=sid;segs[i].speakerName=sp.name;segs[i].speakerColor=sp.color;render()}
+function updASeg(){const i=segs.findIndex(s=>curT>=s.start&&curT<s.end);if(i>=0&&i!==aIdx){aIdx=i;hilight();if($("ascr").checked)scrA()}}
+function scrA(){if(aIdx==null)return;const el=$("seg-list").querySelector(`[data-idx="${aIdx}"]`);if(el)el.scrollIntoView({behavior:"smooth",block:"nearest"})}
+function hilight(){document.querySelectorAll(".seg-row").forEach(el=>{const i=parseInt(el.dataset.idx);el.classList.toggle("active",i===aIdx);el.style.borderLeftColor=i===aIdx?(segs[i]?.speakerColor||"transparent"):"transparent"})}
+function cw(t){if(!t)return false;const l=t.split("\n");return l.some(x=>x.length>42)||l.length>2}
+
+// Render
+function render(){
+  const list=$("seg-list");$("seg-count").textContent=`${segs.length} segment${segs.length!==1?"s":""}`;
+  if(!segs.length){list.innerHTML=`<div id="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".3"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg><span style="font-size:14px">No segments yet</span><span style="font-size:12px">Click "Add Segment" or press <kbd style="background:var(--surface-2);padding:1px 5px;border-radius:3px;border:1px solid var(--border)">N</kbd></span></div>`;return}
+  list.innerHTML="";
+  segs.forEach((s,i)=>{
+    const act=i===aIdx,tw=cw(s.transcription),tlw=cw(s.translation),d=(s.end-s.start).toFixed(1);
+    const sb=spks.map(sp=>`<button class="btn btn-sm btn-ghost" style="padding:0 4px;font-size:9px;color:${sp.color};opacity:${s.speakerId===sp.id?1:.4}" onclick="event.stopPropagation();asgSpk(${i},'${sp.id}')">${sp.name.charAt(0)}</button>`).join("");
+    const r=document.createElement("div");r.className=`seg-row${act?" active":""}`;r.dataset.idx=i;
+    r.style.borderLeftColor=act?s.speakerColor:"transparent";
+    r.onclick=e=>{if(e.target.closest("textarea,input,button"))return;aIdx=i;doSeek(s.start);hilight()};
+    r.innerHTML=`
+      <div class="seg-idx"><span>${i+1}</span><div class="seg-spk-dot" style="background:${s.speakerColor}"></div><span class="seg-spk-name" style="color:${s.speakerColor}">${esc(s.speakerName)}</span></div>
+      <div onclick="event.stopPropagation()"><input class="time-input" value="${fmt(s.start)}" onblur="segs[${i}].start=pf(this.value);save()" onkeydown="if(event.key==='Enter')this.blur()"/><button class="btn btn-sm btn-ghost stamp-btn" onclick="segs[${i}].start=curT;this.previousElementSibling.value=fmt(curT);save()">⏱ Set</button></div>
+      <div onclick="event.stopPropagation()"><input class="time-input" value="${fmt(s.end)}" onblur="segs[${i}].end=pf(this.value);save()" onkeydown="if(event.key==='Enter')this.blur()"/><button class="btn btn-sm btn-ghost stamp-btn" onclick="segs[${i}].end=curT;this.previousElementSibling.value=fmt(curT);save()">⏱ Set</button><div class="seg-dur">${d}s</div></div>
+      <div onclick="event.stopPropagation()" style="padding-right:8px"><textarea class="seg-ta${tw?" warn":""}" rows="3" placeholder="Original text..." oninput="segs[${i}].transcription=this.value;updCC(this);save()">${esc(s.transcription)}</textarea><div class="ff"><div class="sb">${sb}</div>${tw?'<span class="char-warn">⚠ limit</span>':""}<span class="cc">${(s.transcription||"").length}c</span></div></div>
+      <div onclick="event.stopPropagation()" style="padding-right:8px"><textarea class="seg-ta trans${tlw?" warn":""}" rows="3" placeholder="Translation..." oninput="segs[${i}].translation=this.value;updCC(this);save()">${esc(s.translation)}</textarea><div class="ffr">${tlw?'<span class="char-warn">⚠ limit</span>':""}<span class="cc">${(s.translation||"").length}c</span></div></div>
+      <div onclick="event.stopPropagation()" class="seg-actions">
+        <button class="btn btn-sm btn-icon" onclick="splitSeg(${i})" title="Split">✂</button>
+        ${i<segs.length-1?`<button class="btn btn-sm btn-icon" onclick="mergeSeg(${i})" title="Merge">⊕</button>`:""}
+        <button class="btn btn-sm btn-icon btn-danger" onclick="delSeg(${i})" title="Delete">🗑</button>
+      </div>`;
+    list.appendChild(r);
+  });
+  const pad=document.createElement("div");pad.style.height="80px";list.appendChild(pad);
+  save();
+}
+function updCC(ta){const f=ta.closest("div").querySelector(".cc");if(f)f.textContent=ta.value.length+"c";const w=cw(ta.value);ta.classList.toggle("warn",w)}
+
+// Save
+function save(){try{localStorage.setItem(ytId?`subtlab_${ytId}`:"subtlab_local",JSON.stringify({segs,spks}))}catch{}}
+
+// Speaker bar
+function rSpkBar(){
+  const b=$("speaker-bar");b.innerHTML='<span style="font-size:11px;color:var(--text-muted);margin-right:4px;font-weight:500">Active:</span>';
+  spks.forEach(sp=>{const badge=document.createElement("span");badge.className=`spk-badge${aSpk===sp.id?" active":""}`;badge.style.background=sp.color+"22";badge.style.color=sp.color;badge.innerHTML=`<span class="spk-dot" style="background:${sp.color}"></span>${esc(sp.name)}`;badge.onclick=()=>{aSpk=sp.id;rSpkBar()};b.appendChild(badge)});
+}
+rSpkBar();
+function rSpkEd(){
+  const ed=$("sped");ed.innerHTML="";
+  spks.forEach((sp,i)=>{const row=document.createElement("div");row.className="spk-edit-row";
+    row.innerHTML=`<input type="color" value="${sp.color}" onchange="spks[${i}].color=this.value;rSpkBar();render()"/><input type="text" value="${esc(sp.name)}" onchange="spks[${i}].name=this.value;rSpkBar();render()"/>${spks.length>1?`<button class="btn btn-sm btn-icon btn-danger" onclick="spks.splice(${i},1);rSpkEd();rSpkBar();render()">🗑</button>`:""}`;
+    ed.appendChild(row)});
+}
+function addSpkSlot(){if(spks.length>=8)return;const cols=["#8B5CF6","#06B6D4","#F97316","#84CC16","#E11D48","#6366F1","#14B8A6","#FACC15"],n=spks.length;spks.push({id:`s${n+1}`,name:`Speaker ${n+1}`,color:cols[n%cols.length]});rSpkEd();rSpkBar()}
+
+// Export
+function gSRT(f){return segs.map((s,i)=>{const st=fmt(s.start).replace(".",","),en=fmt(s.end).replace(".",","),t=f==="both"?`${s.transcription}\n${s.translation}`:s[f]||"";return`${i+1}\n${st} --> ${en}\n${t}\n`}).join("\n")}
+function gVTT(f){return"WEBVTT\n\n"+segs.map(s=>{const t=f==="both"?`${s.transcription}\n${s.translation}`:s[f]||"";return`${fmt(s.start)} --> ${fmt(s.end)}\n${t}\n`}).join("\n")}
+function gTXT(f){return segs.map(s=>{const sp=s.speakerName?`[${s.speakerName}] `:"",ts=`[${fmt(s.start)}]`;return f==="both"?`${ts} ${sp}${s.transcription}\n    → ${s.translation}`:`${ts} ${sp}${s[f]||""}`}).join("\n\n")}
+function doExp(format,field){let c,ext,m;if(format==="srt"){c=gSRT(field);ext="srt";m="text/plain"}else if(format==="vtt"){c=gVTT(field);ext="vtt";m="text/vtt"}else{c=gTXT(field);ext="txt";m="text/plain"};const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([c],{type:m}));a.download=`transcription.${ext}`;a.click();tog("export-modal");toast(`Exported as .${ext}`)}
+function rExOpts(){const c=$("exopts");c.innerHTML="";[["SRT (transcription)","srt","transcription"],["SRT (translation)","srt","translation"],["SRT (both)","srt","both"],["WebVTT (transcription)","vtt","transcription"],["WebVTT (translation)","vtt","translation"],["Plain text (transcription)","txt","transcription"],["Plain text (translation)","txt","translation"],["Plain text (both)","txt","both"]].forEach(([l,f,fld])=>{const b=document.createElement("button");b.className="btn ebtn";b.textContent="⬇ "+l;b.onclick=()=>doExp(f,fld);c.appendChild(b)})}
+
+// Toggle source
+function togSrc(){srcOff=!srcOff;$("main").classList.toggle("collapsed",srcOff);$("tsb").textContent=srcOff?"▶ Show source":"◀ Hide source"}
+
+// Keyboard shortcuts
+document.addEventListener("keydown",e=>{
+  const inf=e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA";
+  if(inf){if(e.key==="Escape"){e.target.blur();return}if(e.ctrlKey&&e.key==="Enter"){e.preventDefault();togglePlay();return}if(e.ctrlKey&&e.shiftKey&&e.key==="ArrowLeft"){e.preventDefault();doSeek(curT-5);return}if(e.ctrlKey&&e.shiftKey&&e.key==="ArrowRight"){e.preventDefault();doSeek(curT+5);return}return}
+  if(e.key===" "&&!e.ctrlKey){e.preventDefault();togglePlay()}
+  else if(e.key==="ArrowLeft")doSeek(curT-5);
+  else if(e.key==="ArrowRight")doSeek(curT+5);
+  else if(e.key==="ArrowUp"){e.preventDefault();if(aIdx>0){aIdx--;hilight();scrA();doSeek(segs[aIdx].start)}}
+  else if(e.key==="ArrowDown"){e.preventDefault();if(aIdx<segs.length-1){aIdx++;hilight();scrA();doSeek(segs[aIdx].start)}}
+  else if(e.key==="n"||e.key==="N")addSegPH();
+  else if(e.key==="?"||e.shiftKey&&e.key==="/")tog("shortcuts-modal");
+  else if(e.key>="1"&&e.key<="4"&&e.altKey){e.preventDefault();if(aIdx!=null)asgSpk(aIdx,`s${e.key}`)}
+  else if(e.key==="[")setR(Math.max(.25,rate-.25));
+  else if(e.key==="]")setR(Math.min(2,rate+.25));
+});
+</script>
+</body>
+</html>
